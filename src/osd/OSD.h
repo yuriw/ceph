@@ -1653,6 +1653,7 @@ private:
     mclock_opclass,
     mclock_client,
   };
+
   friend std::ostream& operator<<(std::ostream& out, const OSD::io_queue& q);
 
   const io_queue op_queue;
