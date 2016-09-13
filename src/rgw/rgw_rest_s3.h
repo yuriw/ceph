@@ -220,7 +220,6 @@ public:
   ~RGWPostObj_ObjStore_S3() {}
 
   int get_params();
-  int complete_get_params();
   void send_response();
   int get_data(bufferlist& bl);
 };
