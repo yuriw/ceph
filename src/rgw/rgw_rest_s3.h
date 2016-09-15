@@ -182,7 +182,6 @@ class RGWPostObj_ObjStore_S3 : public RGWPostObj_ObjStore {
   string filename;
   RGWPolicyEnv env;
   RGWPolicy post_policy;
-  string err_msg;
 
   int get_policy();
   void rebuild_key(string& key);
