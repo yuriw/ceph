@@ -228,7 +228,6 @@ protected:
 
   struct post_form_part {
     std::string name;
-    std::string content_type;
     std::map<std::string, post_part_field, ltstr_nocase> fields;
     ceph::bufferlist data;
   };
