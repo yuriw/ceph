@@ -179,7 +179,8 @@ public:
 };
 
 class RGWPostObj_ObjStore_S3 : public RGWPostObj_ObjStore {
-  string filename;
+  parts_coll_t parts;
+  std::string filename;
   RGWPolicyEnv env;
   RGWPolicy post_policy;
 

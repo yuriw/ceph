@@ -1436,7 +1436,7 @@ int RGWPostObj_ObjStore_S3::get_params()
   } while (!done);
 
   string object_str;
-  if (!part_str("key", &object_str)) {
+  if (!part_str(parts, "key", &object_str)) {
     err_msg = "Key not specified";
     return -EINVAL;
   }
@@ -1452,7 +1452,7 @@ int RGWPostObj_ObjStore_S3::get_params()
 
   env.add_var("key", s->object.name);
 
-  part_str("Content-Type", &content_type);
+  part_str(parts, "Content-Type", &content_type);
   env.add_var("Content-Type", content_type);
 
   map<string, struct post_form_part, ltstr_nocase>::iterator piter =
@@ -1505,17 +1505,17 @@ int RGWPostObj_ObjStore_S3::get_policy()
 {
   bufferlist encoded_policy;
 
-  if (part_bl("policy", &encoded_policy)) {
+  if (part_bl(parts, "policy", &encoded_policy)) {
 
     // check that the signature matches the encoded policy
     string s3_access_key;
-    if (!part_str("AWSAccessKeyId", &s3_access_key)) {
+    if (!part_str(parts, "AWSAccessKeyId", &s3_access_key)) {
       ldout(s->cct, 0) << "No S3 access key found!" << dendl;
       err_msg = "Missing access key";
       return -EINVAL;
     }
     string received_signature_str;
-    if (!part_str("signature", &received_signature_str)) {
+    if (!part_str(parts, "signature", &received_signature_str)) {
       ldout(s->cct, 0) << "No signature found!" << dendl;
       err_msg = "Missing signature";
       return -EINVAL;
@@ -1673,7 +1673,7 @@ int RGWPostObj_ObjStore_S3::get_policy()
   }
 
   string canned_acl;
-  part_str("acl", &canned_acl);
+  part_str(parts, "acl", &canned_acl);
 
   RGWAccessControlPolicy_S3 s3policy(s->cct);
   ldout(s->cct, 20) << "canned_acl=" << canned_acl << dendl;
@@ -1710,7 +1710,7 @@ void RGWPostObj_ObjStore_S3::send_response()
   if (op_ret == 0 && parts.count("success_action_redirect")) {
     string redirect;
 
-    part_str("success_action_redirect", &redirect);
+    part_str(parts, "success_action_redirect", &redirect);
 
     string tenant;
     string bucket;
@@ -1760,7 +1760,7 @@ void RGWPostObj_ObjStore_S3::send_response()
     string status_string;
     uint32_t status_int;
 
-    part_str("success_action_status", &status_string);
+    part_str(parts, "success_action_status", &status_string);
 
     int r = stringtoul(status_string, &status_int);
     if (r < 0) {
