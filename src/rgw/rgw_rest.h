@@ -271,6 +271,10 @@ protected:
                        const std::string& name,
                        std::string *val);
 
+  static std::string get_part_str(/*const*/ parts_coll_t& parts,
+                                  const std::string& name,
+                                  const std::string& def_val = std::string());
+
   static bool part_bl(/*const*/ parts_coll_t& parts,
                       const std::string& name,
                       ceph::bufferlist *pbl);
