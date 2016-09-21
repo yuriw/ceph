@@ -194,7 +194,7 @@ public:
 
   int get_params();
   void send_response();
-  int get_data(bufferlist& bl);
+  int get_data(ceph::bufferlist& bl, bool* again);
 };
 
 class RGWDeleteObj_ObjStore_S3 : public RGWDeleteObj_ObjStore {
