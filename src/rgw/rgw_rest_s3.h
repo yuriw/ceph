@@ -181,6 +181,7 @@ public:
 class RGWPostObj_ObjStore_S3 : public RGWPostObj_ObjStore {
   parts_coll_t parts;
   std::string filename;
+  std::string content_type;
   RGWPolicyEnv env;
   RGWPolicy post_policy;
 
@@ -188,6 +189,8 @@ class RGWPostObj_ObjStore_S3 : public RGWPostObj_ObjStore {
   void rebuild_key(string& key);
 
   std::string get_current_filename() const override;
+  std::string get_current_contype() const override;
+
 public:
   RGWPostObj_ObjStore_S3() {}
   ~RGWPostObj_ObjStore_S3() {}

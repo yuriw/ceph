@@ -1749,6 +1749,18 @@ std::string RGWFormPost::get_current_filename() const
   return prefix;
 }
 
+std::string RGWFormPost::get_current_contype() const
+{
+  try {
+    const auto& field = current_data_part->fields.at("Content-Type");
+    return field.val;
+  } catch (std::out_of_range&) {
+    /* NOP */;
+  }
+
+  return std::string();
+}
+
 bool RGWFormPost::is_next_file_to_upload()
 {
   if (! stream_done) {
