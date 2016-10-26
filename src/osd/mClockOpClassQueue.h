@@ -101,9 +101,7 @@ namespace ceph {
 
     inline void enqueue_strict(Client cl,
 			       unsigned priority,
-			       Request item) override final {
-      queue.enqueue_strict(get_osd_op_type(item), 0, item);
-    }
+			       Request item) override final;
 
     // Enqueue op in the front of the strict queue
     inline void enqueue_strict_front(Client cl,
@@ -116,9 +114,7 @@ namespace ceph {
     inline void enqueue(Client cl,
 			unsigned priority,
 			unsigned cost,
-			Request item) override final {
-      queue.enqueue(get_osd_op_type(item), priority, cost, item);
-    }
+			Request item) override final;
 
     // Enqueue the op in the front of the regular queue
     inline void enqueue_front(Client cl,
@@ -134,9 +130,7 @@ namespace ceph {
     }
 
     // Return an op to be dispatch
-    inline Request dequeue() override final {
-      return queue.dequeue();
-    }
+    inline Request dequeue() override final;
 
     // Formatted output of the queue
     void dump(ceph::Formatter *f) const override final;

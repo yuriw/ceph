@@ -17,6 +17,7 @@
 
 #include "osd/mClockOpClassQueue.h"
 #include "common/dout.h"
+#include "common/ignore_warning.h"
 
 
 namespace dmc = crimson::dmclock;
@@ -28,6 +29,16 @@ namespace dmc = crimson::dmclock;
 
 
 namespace ceph {
+
+
+  // this is only used for debugging and not outside this class
+  START_UNUSED_FUNC
+  static std::ostream& operator<<(std::ostream& out, const Request& r) {
+    out << "{ pg:" << r.first->info.pgid << ", pg_queueable:{" <<
+      r.second << "} }";
+    return out;
+  }
+  END_UNUSED_FUNC
 
   mClockOpClassQueue::mclock_op_tags_t::mclock_op_tags_t(CephContext *cct) :
     client_op(cct->_conf->osd_op_queue_mclock_client_op_res,
@@ -106,18 +117,62 @@ namespace ceph {
 
     if (osd_op_type_t::client_op != type) {
       return type;
-    } else if (MSG_OSD_SUBOP ==
-	       boost::get<OpRequestRef>(
-		 request.second.get_variant())->get_req()->get_header().type) {
-      return osd_op_type_t::osd_subop;
     } else {
-      return osd_op_type_t::client_op;
+      auto& op_type =
+	boost::get<OpRequestRef>(request.second.get_variant())->get_req()->
+	get_header().type;
+      if (MSG_OSD_SUBOP == op_type) {
+	return osd_op_type_t::osd_subop;
+      } else if (MSG_OSD_PG_PUSH == op_type ||
+		 MSG_OSD_PG_PULL == op_type) {
+	return osd_op_type_t::bg_recovery;
+      } else {
+	return osd_op_type_t::client_op;
+      }
     }
   }
 
   // Formatted output of the queue
   void mClockOpClassQueue::dump(ceph::Formatter *f) const {
     queue.dump(f);
+  }
+
+  inline void mClockOpClassQueue::enqueue_strict(Client cl,
+						 unsigned priority,
+						 Request item) {
+    auto t = get_osd_op_type(item);
+    queue.enqueue_strict(t, 0, item);
+#if 0
+    if (osd_op_type_t::bg_recovery == t) {
+      dout(0) << "mclock enqueue_strict recover op " << item << dendl;
+    }
+#endif
+  }
+
+  // Enqueue op in the back of the regular queue
+  inline void mClockOpClassQueue::enqueue(Client cl,
+					  unsigned priority,
+					  unsigned cost,
+					  Request item) {
+    auto t = get_osd_op_type(item);
+    queue.enqueue(t, priority, cost, item);
+#if 0
+    if (osd_op_type_t::bg_recovery == t) {
+      dout(0) << "mclock enqueue recover op " << item << dendl;
+    }
+#endif
+  }
+
+  // Return an op to be dispatch
+  inline Request mClockOpClassQueue::dequeue() {
+    Request result = queue.dequeue();
+#if 0
+    auto t = get_osd_op_type(result);
+    if (osd_op_type_t::bg_recovery == t) {
+      dout(0) << "mclock dequeue recover op " << result << dendl;
+    }
+#endif
+    return result;
   }
 
 } // namespace ceph
