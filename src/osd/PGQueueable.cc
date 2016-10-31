@@ -12,6 +12,7 @@
  *
  */
 
+#include <sstream>
 
 #include "PG.h"
 #include "PGQueueable.h"
@@ -29,8 +30,30 @@ static ostream& _prefix(std::ostream* _dout, int whoami, epoch_t epoch) {
 
 
 void PGQueueable::RunVis::operator()(const OpRequestRef &op) {
+  static std::map<int,std::string> op_map;
+  if (0 == op_map.size()) {
+    op_map[42] = "CEPH_MSG_OSD_OP";
+    op_map[94] = "MSG_OSD_PG_SCAN";
+    op_map[95] = "MSG_OSD_PG_BACKFILL";
+    op_map[105] = "MSG_OSD_PG_PUSH";
+    op_map[106] = "MSG_OSD_PG_PULL";
+    op_map[107] = "MSG_OSD_PG_PUSH_REPLY";
+    op_map[112] = "MSG_OSD_REPOP";
+    op_map[113] = "MSG_OSD_REPOPREPLY";
+    op_map[114] = "MSG_OSD_PG_UPDATE_LOG_MISSING";
+    op_map[115] = "MSG_OSD_PG_UPDATE_LOG_MISSING_REPLY";
+  }
   // TODO remove dout
   dout(0) << "OPQUEUE DEBUG executing dequeue_op" << dendl;
+  // auto op_type = op->get_req()->get_header().type;
+  auto op_type = op->get_req()->get_type();
+  std::ostringstream op_out;
+  op->get_req()->print(op_out);
+  std::string op_name = op_map[op_type];
+  static std::string unknown = "UNKNOWN";
+  if ("" == op_name) op_name = unknown;
+  dout(0) << "OPWATCH opval:" << op_type << " op:" << op_map[op_type] <<
+    " " << op_out.str() << dendl;
   osd->dequeue_op(pg, op, handle);
 }
 
