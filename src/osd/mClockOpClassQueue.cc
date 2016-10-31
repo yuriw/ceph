@@ -121,16 +121,28 @@ namespace ceph {
       auto& op_type =
 	boost::get<OpRequestRef>(request.second.get_variant())->get_req()->
 	get_header().type;
-      if (MSG_OSD_SUBOP == op_type) {
+
+      switch(op_type) {
+      case MSG_OSD_REPOP:
+      case MSG_OSD_REPOPREPLY:
+      case MSG_OSD_SUBOP:
+      case MSG_OSD_SUBOPREPLY:
 	return osd_op_type_t::osd_subop;
-      } else if (MSG_OSD_PG_PUSH == op_type ||
-		 MSG_OSD_PG_PULL == op_type) {
+
+      case MSG_OSD_PG_PUSH:
+      case MSG_OSD_PG_PULL:
+      case MSG_OSD_PG_PUSH_REPLY:
+      case MSG_OSD_PG_BACKFILL:
 	return osd_op_type_t::bg_recovery;
-      } else {
+
+      case MSG_OSD_REP_SCRUB:
+	return osd_op_type_t::bg_scrub;
+
+      default:
 	return osd_op_type_t::client_op;
       }
     }
-  }
+  } // get_osd_op_type
 
   // Formatted output of the queue
   void mClockOpClassQueue::dump(ceph::Formatter *f) const {
