@@ -32,16 +32,19 @@ static ostream& _prefix(std::ostream* _dout, int whoami, epoch_t epoch) {
 void PGQueueable::RunVis::operator()(const OpRequestRef &op) {
   static std::map<int,std::string> op_map;
   if (0 == op_map.size()) {
-    op_map[42] = "CEPH_MSG_OSD_OP";
-    op_map[94] = "MSG_OSD_PG_SCAN";
-    op_map[95] = "MSG_OSD_PG_BACKFILL";
-    op_map[105] = "MSG_OSD_PG_PUSH";
-    op_map[106] = "MSG_OSD_PG_PULL";
-    op_map[107] = "MSG_OSD_PG_PUSH_REPLY";
-    op_map[112] = "MSG_OSD_REPOP";
-    op_map[113] = "MSG_OSD_REPOPREPLY";
-    op_map[114] = "MSG_OSD_PG_UPDATE_LOG_MISSING";
-    op_map[115] = "MSG_OSD_PG_UPDATE_LOG_MISSING_REPLY";
+    op_map[CEPH_MSG_OSD_OP] = "CEPH_MSG_OSD_OP";
+    op_map[MSG_OSD_PG_SCAN] = "MSG_OSD_PG_SCAN";
+    op_map[MSG_OSD_REP_SCRUB] = "MSG_OSD_REP_SCRUB";
+    op_map[MSG_OSD_PG_BACKFILL] = "MSG_OSD_PG_BACKFILL";
+    op_map[MSG_OSD_PG_PUSH] = "MSG_OSD_PG_PUSH";
+    op_map[MSG_OSD_PG_PULL] = "MSG_OSD_PG_PULL";
+    op_map[MSG_OSD_PG_PUSH_REPLY] = "MSG_OSD_PG_PUSH_REPLY";
+    op_map[MSG_OSD_SUBOP] = "MSG_OSD_SUBOP";
+    op_map[MSG_OSD_SUBOPREPLY] = "MSG_OSD_SUBOPREPLY";
+    op_map[MSG_OSD_REPOP] = "MSG_OSD_REPOP";
+    op_map[MSG_OSD_REPOPREPLY] = "MSG_OSD_REPOPREPLY";
+    op_map[MSG_OSD_PG_UPDATE_LOG_MISSING] = "MSG_OSD_PG_UPDATE_LOG_MISSING";
+    op_map[MSG_OSD_PG_UPDATE_LOG_MISSING_REPLY] = "MSG_OSD_PG_UPDATE_LOG_MISSING_REPLY";
   }
   // TODO remove dout
   dout(0) << "OPQUEUE DEBUG executing dequeue_op" << dendl;
@@ -59,19 +62,19 @@ void PGQueueable::RunVis::operator()(const OpRequestRef &op) {
 
 void PGQueueable::RunVis::operator()(const PGSnapTrim &op) {
   // TODO remove dout
-  dout(0) << "OPQUEUE DEBUG executing snap_trimmer" << dendl;
+  dout(0) << "OPWATCH op:snaptrim" << dendl;
   pg->snap_trimmer(op.epoch_queued);
 }
 
 void PGQueueable::RunVis::operator()(const PGScrub &op) {
   // TODO remove dout
-  dout(0) << "OPQUEUE DEBUG executing scrub" << dendl;
+  dout(0) << "OPWATCH op:scrub" << dendl;
   pg->scrub(op.epoch_queued, handle);
 }
 
 void PGQueueable::RunVis::operator()(const PGRecovery &op) {
   // TODO remove dout
-  dout(0) << "OPQUEUE DEBUG executing do_recovery" << dendl;
+  dout(0) << "OPWATCH op:recovery" << dendl;
   osd->do_recovery(pg.get(), op.epoch_queued, op.reserved_pushes, handle);
 }
 
