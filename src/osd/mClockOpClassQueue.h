@@ -48,7 +48,9 @@ namespace ceph {
   class mClockOpClassQueue : public OpQueue<Request, Client> {
 
     enum class osd_op_type_t {
-      client_op, osd_subop, bg_snaptrim, bg_recovery, bg_scrub };
+      not_yet_known, client_op, osd_subop, reply,
+      bg_snaptrim, bg_recovery, bg_scrub
+    };
 
     using queue_t = mClockQueue<Request, osd_op_type_t>;
 
@@ -59,6 +61,7 @@ namespace ceph {
     struct mclock_op_tags_t {
       crimson::dmclock::ClientInfo client_op;
       crimson::dmclock::ClientInfo osd_subop;
+      crimson::dmclock::ClientInfo reply;
       crimson::dmclock::ClientInfo snaptrim;
       crimson::dmclock::ClientInfo recov;
       crimson::dmclock::ClientInfo scrub;
@@ -140,7 +143,7 @@ namespace ceph {
     struct pg_queueable_visitor_t : public boost::static_visitor<osd_op_type_t> {
       osd_op_type_t operator()(const OpRequestRef& o) const {
 	// don't know if it's a client_op or a
-        return osd_op_type_t::client_op;
+        return osd_op_type_t::not_yet_known;
       }
 
       osd_op_type_t operator()(const PGSnapTrim& o) const {

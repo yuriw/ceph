@@ -743,6 +743,10 @@ OPTION(osd_op_queue_mclock_osd_subop_res, OPT_DOUBLE, 0.0)
 OPTION(osd_op_queue_mclock_osd_subop_wgt, OPT_DOUBLE, 100.0)
 OPTION(osd_op_queue_mclock_osd_subop_lim, OPT_DOUBLE, 0.0)
 
+OPTION(osd_op_queue_mclock_osd_reply_res, OPT_DOUBLE, 0.0)
+OPTION(osd_op_queue_mclock_osd_reply_wgt, OPT_DOUBLE, 1000000.0)
+OPTION(osd_op_queue_mclock_osd_reply_lim, OPT_DOUBLE, 0.0)
+
 OPTION(osd_op_queue_mclock_snap_res, OPT_DOUBLE, 0.0)
 OPTION(osd_op_queue_mclock_snap_wgt, OPT_DOUBLE, 1.0)
 OPTION(osd_op_queue_mclock_snap_lim, OPT_DOUBLE, 0.0)

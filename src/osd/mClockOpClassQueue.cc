@@ -47,6 +47,9 @@ namespace ceph {
     osd_subop(cct->_conf->osd_op_queue_mclock_osd_subop_res,
 	      cct->_conf->osd_op_queue_mclock_osd_subop_wgt,
 	      cct->_conf->osd_op_queue_mclock_osd_subop_lim),
+    reply(cct->_conf->osd_op_queue_mclock_osd_reply_res,
+	  cct->_conf->osd_op_queue_mclock_osd_reply_wgt,
+	  cct->_conf->osd_op_queue_mclock_osd_reply_lim),
     snaptrim(cct->_conf->osd_op_queue_mclock_snap_res,
 	     cct->_conf->osd_op_queue_mclock_snap_wgt,
 	     cct->_conf->osd_op_queue_mclock_snap_lim),
@@ -61,6 +64,7 @@ namespace ceph {
       "mClockOpClassQueue settings:: " <<
       "client_op:" << client_op <<
       "; osd_subop:" << osd_subop <<
+      "; reply:" << reply <<
       "; snaptrim:" << snaptrim <<
       "; recov:" << recov <<
       "; scrub:" << scrub <<
@@ -75,6 +79,8 @@ namespace ceph {
       return mclock_op_tags->client_op;
     case osd_op_type_t::osd_subop:
       return mclock_op_tags->osd_subop;
+    case osd_op_type_t::reply:
+      return mclock_op_tags->reply;
     case osd_op_type_t::bg_snaptrim:
       return mclock_op_tags->snaptrim;
     case osd_op_type_t::bg_recovery:
@@ -115,7 +121,7 @@ namespace ceph {
     // if we got client_op back then we need to distinguish between
     // a client op and an osd subop.
 
-    if (osd_op_type_t::client_op != type) {
+    if (osd_op_type_t::not_yet_known != type) {
       return type;
     } else {
       auto& op_type =
@@ -124,10 +130,13 @@ namespace ceph {
 
       switch(op_type) {
       case MSG_OSD_REPOP:
-      case MSG_OSD_REPOPREPLY:
       case MSG_OSD_SUBOP:
-      case MSG_OSD_SUBOPREPLY:
 	return osd_op_type_t::osd_subop;
+
+      case MSG_OSD_REPOPREPLY:
+      case MSG_OSD_SUBOPREPLY:
+      case MSG_OSD_PG_UPDATE_LOG_MISSING_REPLY:
+	return osd_op_type_t::reply;
 
       case MSG_OSD_PG_PUSH:
       case MSG_OSD_PG_PULL:
@@ -141,7 +150,6 @@ namespace ceph {
 
 	// case CEPH_MSG_OSD_OP:
 	// case MSG_OSD_PG_UPDATE_LOG_MISSING:
-	// case MSG_OSD_PG_UPDATE_LOG_MISSING_REPLY:
       default:
 	return osd_op_type_t::client_op;
       }
