@@ -1743,6 +1743,7 @@ int MDSMonitor::management_command(
     new_fs->fscid = fs->fscid;
     new_fs->mds_map.inline_data_enabled = fs->mds_map.inline_data_enabled;
     new_fs->mds_map.max_mds = 1;
+    new_fs->mds_map.standby_count_wanted = fs->mds_map.standby_count_wanted;
     new_fs->mds_map.data_pools = fs->mds_map.data_pools;
     new_fs->mds_map.metadata_pool = fs->mds_map.metadata_pool;
     new_fs->mds_map.cas_pool = fs->mds_map.cas_pool;
@@ -2030,6 +2031,21 @@ public:
       });
 
       ss << "marked " << (is_down ? "down" : "up");
+    } else if (var == "standby_count_wanted") {
+      if (interr.length()) {
+	ss << var << " requires an integer value";
+	return -EINVAL;
+      }
+      if (n < 0) {
+	ss << var << " must be non-negative";
+	return -ERANGE;
+      }
+      fsmap.modify_filesystem(
+          fs->fscid,
+          [n](std::shared_ptr<Filesystem> fs)
+      {
+        fs->mds_map.set_standby_count_wanted(n);
+      });
     } else {
       ss << "unknown variable " << var;
       return -EINVAL;
