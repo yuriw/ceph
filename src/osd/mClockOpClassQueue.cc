@@ -14,6 +14,7 @@
 
 
 #include <memory>
+#include <sstream>
 
 #include "osd/mClockOpClassQueue.h"
 #include "common/dout.h"
@@ -178,13 +179,23 @@ namespace ceph {
 					  unsigned priority,
 					  unsigned cost,
 					  Request item) {
+    static std::stringstream ss;
     auto t = get_osd_op_type(item);
-    queue.enqueue(t, priority, cost, item);
-#if 0
-    if (osd_op_type_t::bg_recovery == t) {
-      dout(0) << "mclock enqueue recover op " << item << dendl;
+    bool show =
+      osd_op_type_t::bg_recovery == t || osd_op_type_t::client_op == t;
+    if (show && false) {
+      ss << queue;
+      dout(0) << "{ before:" << ss.str() << " }" << dendl;
+      ss.str(std::string());
+      ss.clear();
     }
-#endif
+    queue.enqueue(t, priority, cost, item);
+    if (show) {
+      ss << queue;
+      dout(0) << "{ " << ss.str() << " }" << dendl;
+      ss.str(std::string());
+      ss.clear();
+    }
   }
 
   // Return an op to be dispatch
@@ -198,5 +209,37 @@ namespace ceph {
 #endif
     return result;
   }
+
+
+  std::ostream& operator<<(std::ostream& out,
+			   mClockOpClassQueue::osd_op_type_t t) {
+    switch(t) {
+    case mClockOpClassQueue::osd_op_type_t::not_yet_known:
+      out << "not_yet_known";
+      break;
+    case mClockOpClassQueue::osd_op_type_t::client_op:
+      out << "client_op";
+      break;
+    case mClockOpClassQueue::osd_op_type_t::osd_subop:
+      out << "osd_subop";
+      break;
+    case mClockOpClassQueue::osd_op_type_t::reply:
+      out << "reply";
+      break;
+    case mClockOpClassQueue::osd_op_type_t::bg_snaptrim:
+      out << "bg_snaptrim";
+      break;
+    case mClockOpClassQueue::osd_op_type_t::bg_recovery:
+      out << "bg_recovery";
+      break;
+    case mClockOpClassQueue::osd_op_type_t::bg_scrub:
+      out << "bg_scrub";
+      break;
+    default:
+      out << "UNKNOWN mClockOpClassQueue::osd_op_type";
+    }
+    return out;
+  }
+
 
 } // namespace ceph

@@ -362,6 +362,28 @@ namespace ceph {
       f->dump_int("size", queue.request_count());
       f->close_section();
     } // dump
-  };
+
+    friend std::ostream& operator<<(std::ostream& out, const mClockQueue& q) {
+      out << "{\n";
+      {
+	int size = 0;
+	for (auto i = q.high_queue.crbegin(); i != q.high_queue.crend(); ++i) {
+	  size += i->second.length();
+	}
+	out << "  { high_queue:: size:" << size << " }\n";
+      }
+      out << "  { queue_front:: size:" << q.queue_front.size() << " }\n";
+      {
+	static std::stringstream ss;
+	q.queue.display_queues(ss, false, false, true, false);
+	out << "  { queue:: " << ss.str() << " }\n";
+	ss.str(std::string());
+	ss.clear();
+      }
+      out << "}\n";
+      return out;
+    }
+  }; // class mClockQueue
+
 
 } // namespace ceph

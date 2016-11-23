@@ -19,6 +19,7 @@
 
 #include <list>
 #include <functional>
+#include <ostream>
 
 namespace ceph {
   class Formatter;
@@ -62,7 +63,16 @@ class OpQueue {
     // Formatted output of the queue
     virtual void dump(ceph::Formatter *f) const = 0;
     // Don't leak resources on destruction
-    virtual ~OpQueue() {}; 
+    virtual ~OpQueue() {};
+
+    friend std::ostream& operator<<(std::ostream& out, const OpQueue& q) {
+      ceph::Formatter* formatter =
+	ceph::Formatter::create("json", "json-pretty", "xml");
+      q.dump(formatter);
+      formatter->flush(out);
+      delete formatter;
+      return out;
+    }
 };
 
 #endif
