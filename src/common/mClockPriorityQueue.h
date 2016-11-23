@@ -303,8 +303,8 @@ namespace ceph {
     }
 
     void enqueue(K cl, unsigned priority, unsigned cost, T item) override final {
-      // priority is ignored
-      queue.add_request(item, cl, cost);
+      // priority is ignored, cost is ignored
+      queue.add_request(item, cl);
     }
 
     void enqueue_front(K cl,
