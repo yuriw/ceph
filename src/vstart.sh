@@ -343,7 +343,7 @@ run() {
         if [ "$nodaemon" -eq 0 ]; then
             prun "$@"
         else
-            prunb ./ceph-run "$@" -f
+            prunb ${CEPH_ROOT}/src/ceph-run "$@" -f
         fi
     fi
 }
@@ -685,7 +685,10 @@ EOF
 	    ceph_adm -i "$key_fn" auth add osd.$osd osd "allow *" mon "allow profile osd" mgr "allow"
 	fi
 	echo start osd$osd
-	run 'osd' $SUDO $CEPH_BIN/ceph-osd -i $osd $ARGS $COSD_ARGS
+	old_nodaemon="$nodaemon"
+	nodaemon=1
+	run 'osd' $SUDO $CEPH_BIN/ceph-osd -i $osd $ARGS $COSD_ARGS >${CEPH_OUT_DIR}/osd.${osd}.stdout 2>/dev/null
+	nodaemon="$old_nodaemon"
     done
 fi
 
