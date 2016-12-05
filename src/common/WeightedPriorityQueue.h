@@ -16,6 +16,7 @@
 #define WP_QUEUE_H
 
 #include "OpQueue.h"
+#include "mpmc-bounded-queue.hpp"
 
 #include <boost/intrusive/list.hpp>
 #include <boost/intrusive/rbtree.hpp>
@@ -58,15 +59,21 @@ class WeightedPriorityQueue :  public OpQueue <T, K>
           cost(c),
           item(i)
           {}
+      ~ListPair() {
+	printf("HI\n");
+      }
     };
     class Klass : public bi::set_base_hook<>
     {
+      typedef mpmc_bounded_queue_t<ListPair> ListPairs2;
       typedef bi::list<ListPair> ListPairs;
       typedef typename ListPairs::iterator Lit;
+      typedef typename ListPairs2::iterator Lit2;
       public:
-        K key;		// klass
-        ListPairs lp;
-        Klass(K& k) :
+      K key;		// klass
+      ListPairs lp;
+      ListPairs2 lp2;
+      Klass(K& k) :
           key(k)
           {}
       friend bool operator< (const Klass &a, const Klass &b)
@@ -77,39 +84,43 @@ class WeightedPriorityQueue :  public OpQueue <T, K>
         { return a.key == b.key; }
       void insert(unsigned cost, T& item, bool front) {
         if (front) {
-          lp.push_front(*new ListPair(cost, item));
+          lp2.push_front(*new ListPair(cost, item));
         } else {
-          lp.push_back(*new ListPair(cost, item));
+          lp2.push_back(*new ListPair(cost, item));
         }
       }
       //Get the cost of the next item to dequeue
       unsigned get_cost() const {
         assert(!empty());
-        return lp.begin()->cost;
+        return lp2.begin()->cost;
       }
       T pop() {
-	assert(!lp.empty());
-	T ret = lp.begin()->item;
-        lp.erase_and_dispose(lp.begin(), DelItem<ListPair>());
+	assert(!lp2.empty());
+//	T ret = lp.begin()->item;
+	T ret = lp2.begin()->item;
+//        lp.erase_and_dispose(lp.begin(), DelItem<ListPair>());
+	lp2.erase_and_dispose(lp2.begin());
         return ret;
       }
       bool empty() const {
-        return lp.empty();
+        return lp2.empty();
       }
       unsigned get_size() const {
-	return lp.size();
+	return lp2.size();
       }
       unsigned filter_list_pairs(std::function<bool (T)>& f) {
         unsigned count = 0;
         // intrusive containers can't erase with a reverse_iterator
         // so we have to walk backwards on our own. Since there is
         // no iterator before begin, we have to test at the end.
-        for (Lit i = --lp.end();; --i) {
+        for (Lit2 i = --lp2.end();; --i) {
+//	  for (Lit i = --lp.end();; --i) {
           if (f(i->item)) {
-            i = lp.erase_and_dispose(i, DelItem<ListPair>());
+//            i = lp.erase_and_dispose(i, DelItem<ListPair>());
+	    lp2.erase_and_dispose(i);
             ++count;
           }
-          if (i == lp.begin()) {
+          if (i == lp2.begin()) {
             break;
           }
         }
@@ -117,13 +128,16 @@ class WeightedPriorityQueue :  public OpQueue <T, K>
       }
       unsigned filter_class(std::list<T>* out) {
         unsigned count = 0;
-        for (Lit i = --lp.end();; --i) {
+//        for (Lit i = --lp.end();; --i) {
+	for (Lit2 i = --lp2.end();; --i) {
           if (out) {
             out->push_front(i->item);
-          }
-          i = lp.erase_and_dispose(i, DelItem<ListPair>());
+	  }
+//          i = lp.erase_and_dispose(i, DelItem<ListPair>());
+	  // WARNING - return value
+	  lp2.erase_and_dispose(i);
           ++count;
-          if (i == lp.begin()) {
+          if (i == lp2.begin()) {
             break;
           }
         }
