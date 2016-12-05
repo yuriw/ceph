@@ -38,6 +38,8 @@
 #include "messages/MOSDPGUpdateLogMissingReply.h"
 #include "messages/MCommandReply.h"
 #include "mds/inode_backtrace.h" // Ugh
+#include "common/FuncTrace.h"
+#include "common/OIDTrace.h"
 
 #include "common/config.h"
 #include "include/compat.h"
@@ -1582,6 +1584,7 @@ void ReplicatedPG::do_request(
   OpRequestRef& op,
   ThreadPool::TPHandle &handle)
 {
+  FUNCTRACE();
   assert(!op_must_wait_for_map(get_osdmap()->get_epoch(), op));
   if (can_discard_request(op)) {
     return;
@@ -1721,6 +1724,7 @@ bool ReplicatedPG::check_src_targ(const hobject_t& soid, const hobject_t& toid) 
  */
 void ReplicatedPG::do_op(OpRequestRef& op)
 {
+  FUNCTRACE();
   MOSDOp *m = static_cast<MOSDOp*>(op->get_req());
   assert(m->get_type() == CEPH_MSG_OSD_OP);
 
@@ -3043,6 +3047,7 @@ void ReplicatedPG::promote_object(ObjectContextRef obc,
 
 void ReplicatedPG::execute_ctx(OpContext *ctx)
 {
+  FUNCTRACE();
   dout(10) << __func__ << " " << ctx << dendl;
   ctx->reset_obs(ctx->obc);
   ctx->update_log_only = false; // reset in case finish_copyfrom() is re-running execute_ctx
@@ -4324,6 +4329,7 @@ bool ReplicatedPG::maybe_create_new_object(OpContext *ctx)
 
 int ReplicatedPG::do_osd_ops(OpContext *ctx, vector<OSDOp>& ops)
 {
+  FUNCTRACE();
   int result = 0;
   SnapSetContext *ssc = ctx->obc->ssc;
   ObjectState& obs = ctx->new_obs;
@@ -6711,6 +6717,7 @@ void ReplicatedPG::complete_disconnect_watches(
 
 void ReplicatedPG::do_osd_op_effects(OpContext *ctx, const ConnectionRef& conn)
 {
+  FUNCTRACE();
   entity_name_t entity = ctx->reqid.name;
   dout(15) << "do_osd_op_effects " << entity << " con " << conn.get() << dendl;
 
@@ -6818,6 +6825,7 @@ hobject_t ReplicatedPG::get_temp_recovery_object(eversion_t version, snapid_t sn
 
 int ReplicatedPG::prepare_transaction(OpContext *ctx)
 {
+  FUNCTRACE();
   assert(!ctx->ops.empty());
   
   const hobject_t& soid = ctx->obs->oi.soid;
@@ -7101,6 +7109,7 @@ void ReplicatedPG::apply_ctx_stats(OpContext *ctx, bool scrub_ok)
 
 void ReplicatedPG::complete_read_ctx(int result, OpContext *ctx)
 {
+  FUNCTRACE();
   MOSDOp *m = static_cast<MOSDOp*>(ctx->op->get_req());
   assert(ctx->async_reads_complete());
 
@@ -7139,6 +7148,15 @@ void ReplicatedPG::complete_read_ctx(int result, OpContext *ctx)
   reply->add_flags(CEPH_OSD_FLAG_ACK | CEPH_OSD_FLAG_ONDISK);
   osd->send_message_osd_client(reply, m->get_connection());
   close_op_ctx(ctx);
+#ifdef WITH_LTTNG
+  if (m) {
+    ostringstream buf;
+    buf << m->get_source() << "!" << m->get_source_addr() << "!"
+        << m->get_tid() << "!" << m->get_seq() << "!" << m->get_type() << ","
+        << ((MOSDOp *)m)->get_oid().name.c_str();
+    OID_EVENT_TRACE(buf.str().c_str(), "OSD_READ_OP_COMPLETE");
+  }
+#endif
 }
 
 // ========================================================================
@@ -8553,6 +8571,7 @@ public:
 
 void ReplicatedPG::repop_all_committed(RepGather *repop)
 {
+  FUNCTRACE();
   dout(10) << __func__ << ": repop tid " << repop->rep_tid << " all committed "
 	   << dendl;
   repop->all_committed = true;
@@ -8563,11 +8582,25 @@ void ReplicatedPG::repop_all_committed(RepGather *repop)
       last_complete_ondisk = repop->pg_local_last_complete;
     }
     eval_repop(repop);
+#ifdef WITH_LTTNG
+    MOSDOp *m = NULL;
+    if (repop->op) {
+      m = static_cast<MOSDOp *>(repop->op->get_req());
+      if (m) {
+        ostringstream buf;
+        buf << m->get_source() << "!" << m->get_source_addr() << "!"
+            << m->get_tid() << "!" << m->get_seq() << "!" << m->get_type() <<","
+            << ((MOSDOp *)m)->get_oid().name.c_str();
+        OID_EVENT_TRACE(buf.str().c_str(), "OSD_WRITE_OP_COMPLETE");
+      }
+    }
+#endif
   }
 }
 
 void ReplicatedPG::op_applied(const eversion_t &applied_version)
 {
+  FUNCTRACE();
   dout(10) << "op_applied version " << applied_version << dendl;
   if (applied_version == eversion_t())
     return;
@@ -8598,6 +8631,7 @@ void ReplicatedPG::op_applied(const eversion_t &applied_version)
 
 void ReplicatedPG::eval_repop(RepGather *repop)
 {
+  FUNCTRACE();
   MOSDOp *m = NULL;
   if (repop->op)
     m = static_cast<MOSDOp *>(repop->op->get_req());
@@ -8699,6 +8733,7 @@ void ReplicatedPG::eval_repop(RepGather *repop)
 
 void ReplicatedPG::issue_repop(RepGather *repop, OpContext *ctx)
 {
+  FUNCTRACE();
   const hobject_t& soid = ctx->obs->oi.soid;
   dout(7) << "issue_repop rep_tid " << repop->rep_tid
           << " o " << soid
@@ -8766,6 +8801,7 @@ ReplicatedPG::RepGather *ReplicatedPG::new_repop(
   OpContext *ctx, ObjectContextRef obc,
   ceph_tid_t rep_tid)
 {
+  FUNCTRACE();
   if (ctx->op)
     dout(10) << "new_repop rep_tid " << rep_tid << " on " << *ctx->op->get_req() << dendl;
   else
@@ -8806,6 +8842,7 @@ boost::intrusive_ptr<ReplicatedPG::RepGather> ReplicatedPG::new_repop(
  
 void ReplicatedPG::remove_repop(RepGather *repop)
 {
+  FUNCTRACE();
   dout(20) << __func__ << " " << *repop << dendl;
 
   for (auto p = repop->on_finish.begin();
@@ -9143,6 +9180,7 @@ void ReplicatedPG::handle_watch_timeout(WatchRef watch)
 ObjectContextRef ReplicatedPG::create_object_context(const object_info_t& oi,
 						     SnapSetContext *ssc)
 {
+  FUNCTRACE();
   ObjectContextRef obc(object_contexts.lookup_or_create(oi.soid));
   assert(obc->destructor_callback == NULL);
   obc->destructor_callback = new C_PG_ObjectContext(this, obc.get());  
@@ -9279,6 +9317,7 @@ int ReplicatedPG::find_object_context(const hobject_t& oid,
 				      bool map_snapid_to_clone,
 				      hobject_t *pmissing)
 {
+  FUNCTRACE();
   assert(oid.pool == static_cast<int64_t>(info.pgid.pool()));
   // want the head?
   if (oid.snap == CEPH_NOSNAP) {
