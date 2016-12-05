@@ -76,7 +76,7 @@ AioObjectRequest<I>::AioObjectRequest(ImageCtx *ictx, const std::string &oid,
                                       Context *completion, bool hide_enoent)
   : m_ictx(ictx), m_oid(oid), m_object_no(objectno), m_object_off(off),
     m_object_len(len), m_snap_id(snap_id), m_completion(completion),
-    m_hide_enoent(hide_enoent) {
+    m_hide_enoent(hide_enoent), m_has_parent(false) {
 
   Striper::extent_to_file(m_ictx->cct, &m_ictx->layout, m_object_no,
                           0, m_ictx->layout.object_size, m_parent_extents);
@@ -112,6 +112,7 @@ bool AioObjectRequest<I>::compute_parent_extents() {
     lderr(m_ictx->cct) << this << " compute_parent_extents: failed to "
                        << "retrieve parent overlap: " << cpp_strerror(r)
                        << dendl;
+    m_has_parent = false;
     m_parent_extents.clear();
     return false;
   }
@@ -122,6 +123,7 @@ bool AioObjectRequest<I>::compute_parent_extents() {
     ldout(m_ictx->cct, 20) << this << " compute_parent_extents: "
                            << "overlap " << parent_overlap << " "
                            << "extents " << m_parent_extents << dendl;
+    m_has_parent = !m_parent_extents.empty();
     return true;
   }
   return false;
