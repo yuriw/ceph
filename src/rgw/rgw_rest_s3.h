@@ -178,51 +178,26 @@ public:
                                                       bufferlist& bl_out);
 };
 
-struct post_part_field {
-  string val;
-  map<string, string> params;
-};
-
-struct post_form_part {
-  string name;
-  string content_type;
-  map<string, struct post_part_field, ltstr_nocase> fields;
-  bufferlist data;
-};
-
 class RGWPostObj_ObjStore_S3 : public RGWPostObj_ObjStore {
-  string boundary;
-  string filename;
-  bufferlist in_data;
-  map<string, post_form_part, const ltstr_nocase> parts;  
+  parts_coll_t parts;
+  std::string filename;
+  std::string content_type;
   RGWPolicyEnv env;
   RGWPolicy post_policy;
-  string err_msg;
-
-  int read_with_boundary(bufferlist& bl, uint64_t max, bool check_eol,
-                         bool *reached_boundary,
-			 bool *done);
-
-  int read_line(bufferlist& bl, uint64_t max,
-                bool *reached_boundary, bool *done);
-
-  int read_data(bufferlist& bl, uint64_t max, bool *reached_boundary, bool *done);
-
-  int read_form_part_header(struct post_form_part *part,
-                            bool *done);
-  bool part_str(const string& name, string *val);
-  bool part_bl(const string& name, bufferlist *pbl);
 
   int get_policy();
   void rebuild_key(string& key);
+
+  std::string get_current_filename() const override;
+  std::string get_current_contype() const override;
+
 public:
   RGWPostObj_ObjStore_S3() {}
   ~RGWPostObj_ObjStore_S3() {}
 
   int get_params();
-  int complete_get_params();
   void send_response();
-  int get_data(bufferlist& bl);
+  int get_data(ceph::bufferlist& bl, bool* again);
 };
 
 class RGWDeleteObj_ObjStore_S3 : public RGWDeleteObj_ObjStore {

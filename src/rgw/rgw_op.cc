@@ -3195,15 +3195,10 @@ void RGWPostObj::pre_exec()
 
 void RGWPostObj::execute()
 {
-  RGWPutObjDataProcessor *filter = NULL;
-  char calc_md5[CEPH_CRYPTO_MD5_DIGESTSIZE * 2 + 1];
-  unsigned char m[CEPH_CRYPTO_MD5_DIGESTSIZE];
-  MD5 hash;
-  buffer::list bl, aclbl;
-  int len = 0;
+  RGWPutObjDataProcessor *filter = nullptr;
   boost::optional<RGWPutObj_Compress> compressor;
 
-  // read in the data from the POST form
+  /* Read in the data from the POST form. */
   op_ret = get_params();
   if (op_ret < 0) {
     return;
@@ -3219,105 +3214,122 @@ void RGWPostObj::execute()
     return;
   }
 
-  op_ret = store->check_quota(s->bucket_owner.get_id(), s->bucket,
-			      user_quota, bucket_quota, s->content_length);
-  if (op_ret < 0) {
-    return;
-  }
+  /* Start iteration over data fields. It's necessary as Swift's FormPost
+   * is capable to handle multiple files in single form. */
+  do {
+    char calc_md5[CEPH_CRYPTO_MD5_DIGESTSIZE * 2 + 1];
+    unsigned char m[CEPH_CRYPTO_MD5_DIGESTSIZE];
+    MD5 hash;
+    ceph::buffer::list bl, aclbl;
+    int len = 0;
 
-  RGWPutObjProcessor_Atomic processor(*static_cast<RGWObjectCtx *>(s->obj_ctx),
-                                      s->bucket_info,
-                                      s->bucket,
-                                      s->object.name,
-                                      /* part size */
-                                      s->cct->_conf->rgw_obj_stripe_size,
-                                      s->req_id,
-                                      s->bucket_info.versioning_enabled());
-
-  // no filters by default
-  filter = &processor;
-
-  op_ret = processor.prepare(store, nullptr);
-  if (op_ret < 0)
-    return;
-
-  const auto& compression_type = store->get_zone_params().get_compression_type(
-      s->bucket_info.placement_rule);
-  CompressorRef plugin;
-  if (compression_type != "none") {
-    plugin = Compressor::create(s->cct, compression_type);
-    if (!plugin) {
-      ldout(s->cct, 1) << "Cannot load plugin for compression type "
-          << compression_type << dendl;
-    } else {
-      compressor.emplace(s->cct, plugin, filter);
-      filter = &*compressor;
+    op_ret = store->check_quota(s->bucket_owner.get_id(),
+                                s->bucket,
+                                user_quota,
+                                bucket_quota,
+                                s->content_length);
+    if (op_ret < 0) {
+      return;
     }
-  }
 
-  while (data_pending) {
-     bufferlist data;
-     len = get_data(data);
+    RGWPutObjProcessor_Atomic processor(*static_cast<RGWObjectCtx *>(s->obj_ctx),
+                                        s->bucket_info,
+                                        s->bucket,
+                                        get_current_filename(),
+                                        /* part size */
+                                        s->cct->_conf->rgw_obj_stripe_size,
+                                        s->req_id,
+                                        s->bucket_info.versioning_enabled());
+    /* No filters by default. */
+    filter = &processor;
 
-     if (len < 0) {
-       op_ret = len;
-       return;
-     }
+    op_ret = processor.prepare(store, nullptr);
+    if (op_ret < 0) {
+      return;
+    }
 
-     if (!len)
-       break;
+    const auto& compression_type = store->get_zone_params().get_compression_type(
+        s->bucket_info.placement_rule);
+    CompressorRef plugin;
+    if (compression_type != "none") {
+      plugin = Compressor::create(s->cct, compression_type);
+      if (! plugin) {
+        ldout(s->cct, 1) << "Cannot load plugin for compression type "
+                         << compression_type << dendl;
+      } else {
+        compressor.emplace(s->cct, plugin, filter);
+        filter = &*compressor;
+      }
+    }
 
-     hash.Update((const byte *)data.c_str(), data.length());
-     op_ret = put_data_and_throttle(filter, data, ofs, false);
+    bool again;
+    do {
+      ceph::bufferlist data;
+      len = get_data(data, &again);
 
-     ofs += len;
+      if (len < 0) {
+        op_ret = len;
+        return;
+      }
 
-     if (ofs > max_len) {
-       op_ret = -ERR_TOO_LARGE;
-       return;
-     }
-   }
+      if (! len) {
+        break;
+      }
 
-  if (len < min_len) {
-    op_ret = -ERR_TOO_SMALL;
-    return;
-  }
+      hash.Update((const byte *)data.c_str(), data.length());
+      op_ret = put_data_and_throttle(filter, data, ofs, false);
 
-  s->obj_size = ofs;
+      ofs += len;
 
-  op_ret = store->check_quota(s->bucket_owner.get_id(), s->bucket,
-			      user_quota, bucket_quota, s->obj_size);
-  if (op_ret < 0) {
-    return;
-  }
+      if (ofs > max_len) {
+        op_ret = -ERR_TOO_LARGE;
+        return;
+      }
+    } while (again);
 
-  hash.Final(m);
-  buf_to_hex(m, CEPH_CRYPTO_MD5_DIGESTSIZE, calc_md5);
+    if (len < min_len) {
+      op_ret = -ERR_TOO_SMALL;
+      return;
+    }
 
-  etag = calc_md5;
-  bl.append(etag.c_str(), etag.size() + 1);
-  emplace_attr(RGW_ATTR_ETAG, std::move(bl));
+    s->obj_size = ofs;
 
-  policy.encode(aclbl);
-  emplace_attr(RGW_ATTR_ACL, std::move(aclbl));
+    op_ret = store->check_quota(s->bucket_owner.get_id(), s->bucket,
+                                user_quota, bucket_quota, s->obj_size);
+    if (op_ret < 0) {
+      return;
+    }
 
-  if (content_type.size()) {
-    bufferlist ct_bl;
-    ct_bl.append(content_type.c_str(), content_type.size() + 1);
-    emplace_attr(RGW_ATTR_CONTENT_TYPE, std::move(ct_bl));
-  }
+    hash.Final(m);
+    buf_to_hex(m, CEPH_CRYPTO_MD5_DIGESTSIZE, calc_md5);
 
-  if (compressor && compressor->is_compressed()) {
-    bufferlist tmp;
-    RGWCompressionInfo cs_info;
-    cs_info.compression_type = plugin->get_type_name();
-    cs_info.orig_size = s->obj_size;
-    cs_info.blocks = move(compressor->get_compression_blocks());
-    ::encode(cs_info, tmp);
-    emplace_attr(RGW_ATTR_COMPRESSION, std::move(tmp));
-  }
+    etag = calc_md5;
+    bl.append(etag.c_str(), etag.size() + 1);
+    emplace_attr(RGW_ATTR_ETAG, std::move(bl));
 
-  op_ret = processor.complete(s->obj_size, etag, NULL, real_time(), attrs, delete_at);
+    policy.encode(aclbl);
+    emplace_attr(RGW_ATTR_ACL, std::move(aclbl));
+
+    const std::string content_type = get_current_contype();
+    if (! content_type.empty()) {
+      ceph::bufferlist ct_bl;
+      ct_bl.append(content_type.c_str(), content_type.size() + 1);
+      emplace_attr(RGW_ATTR_CONTENT_TYPE, std::move(ct_bl));
+    }
+
+    if (compressor && compressor->is_compressed()) {
+      ceph::bufferlist tmp;
+      RGWCompressionInfo cs_info;
+      cs_info.compression_type = plugin->get_type_name();
+      cs_info.orig_size = s->obj_size;
+      cs_info.blocks = move(compressor->get_compression_blocks());
+      ::encode(cs_info, tmp);
+      emplace_attr(RGW_ATTR_COMPRESSION, std::move(tmp));
+    }
+
+    op_ret = processor.complete(s->obj_size, etag, nullptr, real_time(),
+                                attrs, delete_at);
+  } while (is_next_file_to_upload());
 }
 
 

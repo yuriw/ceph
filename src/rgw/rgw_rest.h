@@ -215,14 +215,77 @@ public:
   int get_padding_last_aws4_chunk_encoded(bufferlist &bl, uint64_t chunk_size);
 };
 
+
 class RGWPostObj_ObjStore : public RGWPostObj
 {
+  std::string boundary;
+
+protected:
+  struct post_part_field {
+    std::string val;
+    std::map<std::string, std::string> params;
+  };
+
+  struct post_form_part {
+    std::string name;
+    std::map<std::string, post_part_field, ltstr_nocase> fields;
+    ceph::bufferlist data;
+  };
+
+  using parts_coll_t = \
+    std::map<std::string, post_form_part, const ltstr_nocase>;
+
+  std::string err_msg;
+  ceph::bufferlist in_data;
+
+  int read_with_boundary(ceph::bufferlist& bl,
+                         uint64_t max,
+                         bool check_eol,
+                         bool* reached_boundary,
+                         bool* done);
+
+  int read_line(ceph::bufferlist& bl,
+                uint64_t max,
+                bool* reached_boundary,
+                bool* done);
+
+  int read_data(ceph::bufferlist& bl,
+                uint64_t max,
+                bool* reached_boundary,
+                bool* done);
+
+  int read_form_part_header(struct post_form_part *part,
+                            bool *done);
+
+  int get_params() override;
+
+  static int parse_part_field(const std::string& line,
+                              std::string& field_name, /* out */
+                              post_part_field& field); /* out */
+
+  static void parse_boundary_params(const std::string& params_str,
+                                    std::string& first,
+                                    std::map<std::string, std::string>& params);
+
+  static bool part_str(/*const*/ parts_coll_t& parts,
+                       const std::string& name,
+                       std::string *val);
+
+  static std::string get_part_str(/*const*/ parts_coll_t& parts,
+                                  const std::string& name,
+                                  const std::string& def_val = std::string());
+
+  static bool part_bl(/*const*/ parts_coll_t& parts,
+                      const std::string& name,
+                      ceph::bufferlist *pbl);
+
 public:
   RGWPostObj_ObjStore() {}
   ~RGWPostObj_ObjStore() {}
 
   virtual int verify_params();
 };
+
 
 class RGWPutMetadataAccount_ObjStore : public RGWPutMetadataAccount
 {
