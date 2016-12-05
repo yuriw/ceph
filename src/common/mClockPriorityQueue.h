@@ -374,11 +374,9 @@ namespace ceph {
       }
       out << "  { queue_front:: size:" << q.queue_front.size() << " }\n";
       {
-	static std::stringstream ss;
+	std::stringstream ss;
 	q.queue.display_queues(ss, false, false, true, false);
 	out << "  { queue:: " << ss.str() << " }\n";
-	ss.str(std::string());
-	ss.clear();
       }
       out << "}\n";
       return out;

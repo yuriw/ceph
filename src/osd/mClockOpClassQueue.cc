@@ -29,6 +29,9 @@ namespace dmc = crimson::dmclock;
 #define dout_prefix *_dout
 
 
+#define TEMPORARY 1
+
+
 namespace ceph {
 
 
@@ -179,23 +182,25 @@ namespace ceph {
 					  unsigned priority,
 					  unsigned cost,
 					  Request item) {
-    static std::stringstream ss;
+#ifdef TEMPORARY
+    std::stringstream ss;
+#endif
     auto t = get_osd_op_type(item);
+#ifdef TEMPORARY
     bool show =
       osd_op_type_t::bg_recovery == t || osd_op_type_t::client_op == t;
     if (show && false) {
       ss << queue;
       dout(0) << "{ before:" << ss.str() << " }" << dendl;
-      ss.str(std::string());
-      ss.clear();
     }
+#endif
     queue.enqueue(t, priority, cost, item);
+#ifdef TEMPORARY
     if (show) {
       ss << queue;
       dout(0) << "{ " << ss.str() << " }" << dendl;
-      ss.str(std::string());
-      ss.clear();
     }
+#endif
   }
 
   // Return an op to be dispatch
