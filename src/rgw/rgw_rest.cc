@@ -372,7 +372,7 @@ void dump_errno(const struct rgw_err &err, string& out) {
 
 void dump_errno(struct req_state *s)
 {
-  dump_status(s, s->err->http_ret, http_status_names[s->err->http_ret]);
+  dump_status(s, s->err.http_ret, http_status_names[s->err.http_ret]);
 }
 
 void dump_errno(struct req_state *s, int http_ret)
@@ -660,7 +660,7 @@ void dump_trans_id(req_state *s)
   }
 }
 
-void end_header(struct req_state* s, boost::function<void()> dump_more,
+void end_header(struct req_state* s, RGWHandler* handler, boost::function<void()> dump_more,
 		const char *content_type, const int64_t proposed_content_length,
 		bool force_content_type, bool force_no_error)
 {
@@ -706,7 +706,7 @@ void end_header(struct req_state* s, boost::function<void()> dump_more,
   }
   if (!force_no_error && s->is_err()) {
     dump_start(s);
-    s->err->dump();
+    handler->dump(s->err.s3_code, s->err.message);
     dump_content_length(s, s->formatter->get_len());
   } else {
     if (proposed_content_length == CHUNKED_TRANSFER_ENCODING) {
@@ -731,19 +731,19 @@ void end_header(struct req_state* s, boost::function<void()> dump_more,
   rgw_flush_formatter_and_reset(s, s->formatter);
 }
 
-void end_header(struct req_state* s, RGWOp* op, const char *content_type,
+void end_header(struct req_state* s, RGWHandler* handler, RGWOp* op, const char *content_type,
 		const int64_t proposed_content_length, bool force_content_type,
 		bool force_no_error)
 {
   boost::function<void()> dump_more;
 
   if (op) dump_more = op->dump_access_control_f();
-  end_header(s, dump_more, content_type,
+  end_header(s, handler, dump_more, content_type,
 	proposed_content_length, force_content_type, force_no_error);
 }
 
 void abort_early(struct req_state *s, boost::function<void()> dump_more,
-		string& error_content, int err_no)
+		string& error_content, int err_no, RGWHandler* handler)
 {
   if (!s->formatter) {
     s->formatter = new JSONFormatter;
@@ -754,8 +754,8 @@ void abort_early(struct req_state *s, boost::function<void()> dump_more,
   // returned 0. If non-zero, we need to continue here.
   if (err_no) {
     // Watch out, we might have a custom error state already set!
-    if (!s->err->http_ret || s->err->http_ret == 200) {
-      s->set_req_state_err(err_no);
+    if (!s->err.http_ret || s->err.http_ret == 200) {
+      s->set_req_state_err(err_no, handler);
     }
     dump_errno(s);
     dump_bucket_from_state(s);
@@ -791,10 +791,10 @@ void abort_early(struct req_state *s, boost::function<void()> dump_more,
        *   x-amz-error-message: The specified key does not exist.
        *   x-amz-error-detail-Key: foo
        */
-      end_header(s, dump_more, NULL, error_content.size(), false, true);
+      end_header(s, handler, dump_more, NULL, error_content.size(), false, true);
       RESTFUL_IO(s)->send_body(error_content.c_str(), error_content.size());
     } else {
-      end_header(s, dump_more);
+      end_header(s, handler, dump_more);
     }
     rgw_flush_formatter(s, s->formatter);
   }
@@ -822,7 +822,7 @@ void abort_early(struct req_state *s, RGWOp* op, int err_no,
     err_no = new_err_no;
   }
   if (op) dump_more = op->dump_access_control_f();
-  abort_early(s, dump_more, error_content, err_no);
+  abort_early(s, dump_more, error_content, err_no, handler);
 }
 
 void dump_continue(struct req_state * const s)
@@ -1104,10 +1104,10 @@ int RESTArgs::get_bool(struct req_state *s, const string& name, bool def_val, bo
 
 void RGWRESTFlusher::do_start(int ret)
 {
-  s->set_req_state_err(ret); /* no going back from here */
+  s->set_req_state_err(ret, handler); /* no going back from here */
   dump_errno(s);
   dump_start(s);
-  end_header(s, op);
+  end_header(s, handler, op);
   rgw_flush_formatter_and_reset(s, s->formatter);
 }
 
@@ -1503,9 +1503,9 @@ int RGWDeleteMultiObj_ObjStore::get_params()
 void RGWRESTOp::send_response()
 {
   if (!flusher.did_start()) {
-    s->set_req_state_err(http_ret);
+    s->set_req_state_err(http_ret, dialect_handler);
     dump_errno(s);
-    end_header(s, this);
+    end_header(s, dialect_handler, this);
   }
   flusher.flush();
 }
@@ -1554,6 +1554,36 @@ void RGWHandler_REST::put_op(RGWOp* op)
 {
   delete op;
 } /* put_op */
+
+bool RGWHandler_REST::set_rgw_err(int err_no, bool is_website_redirect, int& http_ret, string& code)
+{
+  auto r = rgw_http_s3_errors.find(err_no);
+  if (r != rgw_http_s3_errors.end()) {
+    if (!is_website_redirect) {
+      http_ret = r->second.first;
+      code = r->second.second;
+      return true;
+    }
+  }
+  return false;
+}
+
+void RGWHandler_REST::dump(const string& code, const string& message) const
+{
+  if (s->format != RGW_FORMAT_HTML)
+    s->formatter->open_object_section("Error");
+  if (!code.empty())
+    s->formatter->dump_string("Code", code);
+  if (!message.empty())
+    s->formatter->dump_string("Message", message);
+  if (!s->bucket_name.empty())	// TODO: connect to expose_bucket
+    s->formatter->dump_string("BucketName", s->bucket_name);
+  if (!s->trans_id.empty())	// TODO: connect to expose_bucket or another toggle
+    s->formatter->dump_string("RequestId", s->trans_id);
+  s->formatter->dump_string("HostId", s->host_id);
+  if (s->format != RGW_FORMAT_HTML)
+    s->formatter->close_section();
+}
 
 int RGWHandler_REST::allocate_formatter(struct req_state *s,
 					int default_type,

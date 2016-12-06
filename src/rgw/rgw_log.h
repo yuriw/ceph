@@ -3,7 +3,6 @@
 
 #ifndef CEPH_RGW_LOG_H
 #define CEPH_RGW_LOG_H
-
 #include "rgw_common.h"
 #include "include/utime.h"
 #include "common/Formatter.h"

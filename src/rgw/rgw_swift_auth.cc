@@ -605,9 +605,9 @@ void RGW_SWIFT_Auth_Get::execute()
   ret = STATUS_NO_CONTENT;
 
 done:
-  s->set_req_state_err(ret);
+  s->set_req_state_err(ret, dialect_handler);
   dump_errno(s);
-  end_header(s);
+  end_header(s, dialect_handler);
 }
 
 int RGWHandler_SWIFT_Auth::init(RGWRados *store, struct req_state *state,

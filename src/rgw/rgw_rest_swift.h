@@ -274,6 +274,7 @@ public:
 
   RGWAccessControlPolicy *alloc_policy() { return NULL; /* return new RGWAccessControlPolicy_SWIFT; */ }
   void free_policy(RGWAccessControlPolicy *policy) { delete policy; }
+  virtual bool set_rgw_err(int err_no, bool is_website_redirect, int& http_ret, string& code) override;
 };
 
 class RGWHandler_REST_Service_SWIFT : public RGWHandler_REST_SWIFT {

@@ -148,7 +148,6 @@ int process_request(RGWRados* const store,
   RGWRESTMgr *mgr;
   RGWHandler_REST *handler = rest->get_handler(store, s, frontend_prefix,
                                                client_io, &mgr, &init_error);
-  if (!s->err) s->err = new rgw_err(s);
   if (init_error != 0) {
     abort_early(s, NULL, init_error, NULL);
     goto done;
@@ -213,7 +212,7 @@ done:
     rgw_log_op(store, s, (op ? op->name() : "unknown"), olog);
   }
 
-  int http_ret = s->err->http_ret;
+  int http_ret = s->err.http_ret;
   int op_ret = 0;
   if (op) {
     op_ret = op->get_ret();
@@ -232,5 +231,5 @@ done:
 	  << " ======"
 	  << dendl;
 
-  return (ret < 0 ? ret : s->err->ret);
+  return (ret < 0 ? ret : s->err.ret);
 } /* process_request */

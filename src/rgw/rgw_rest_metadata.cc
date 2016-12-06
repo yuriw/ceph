@@ -200,14 +200,14 @@ void RGWOp_Metadata_Put::send_response() {
   int http_return_code = http_ret;
   if ((http_ret == STATUS_NO_APPLY) || (http_ret == STATUS_APPLIED))
     http_return_code = STATUS_NO_CONTENT;
-  s->set_req_state_err(http_return_code);
+  s->set_req_state_err(http_return_code, dialect_handler);
   dump_errno(s);
   stringstream ver_stream;
   ver_stream << "ver:" << ondisk_version.ver
 	     <<",tag:" << ondisk_version.tag;
   dump_header_if_nonempty(s, "RGWX_UPDATE_STATUS", update_status);
   dump_header_if_nonempty(s, "RGWX_UPDATE_VERSION", ver_stream.str());
-  end_header(s);
+  end_header(s, dialect_handler);
 }
 
 void RGWOp_Metadata_Delete::execute() {

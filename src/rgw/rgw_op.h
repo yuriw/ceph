@@ -1593,6 +1593,8 @@ public:
   virtual int authorize() = 0;
   virtual int postauth_init() = 0;
   virtual int error_handler(int err_no, string *error_content);
+  virtual bool set_rgw_err(int err_no, bool is_website_redirect, int& http_ret, string& code) { return false;}
+  virtual void dump(const string& code, const string& message) const {}
 };
 
 extern int rgw_build_bucket_policies(RGWRados* store, struct req_state* s);

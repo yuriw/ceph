@@ -74,9 +74,9 @@ void RGWOp_Opstate_List::send_response() {
   if (sent_header)
     return;
 
-  s->set_req_state_err(http_ret);
+  s->set_req_state_err(http_ret, dialect_handler);
   dump_errno(s);
-  end_header(s);
+  end_header(s, dialect_handler);
 
   sent_header = true;
 

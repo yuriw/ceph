@@ -7,6 +7,7 @@
 #include "json_spirit/json_spirit.h"
 #include "common/ceph_json.h"
 
+#include "rgw_op.h"
 #include "rgw_common.h"
 #include "rgw_acl.h"
 #include "rgw_string.h"
@@ -137,7 +138,7 @@ void rgw_perf_stop(CephContext *cct)
 using namespace ceph::crypto;
 
 rgw_err::
-rgw_err(req_state *s) : s(*s)
+rgw_err()
 {
   clear();
 }
@@ -236,7 +237,7 @@ void req_info::rebuild_from(req_info& src)
 
 
 req_state::req_state(CephContext* _cct, RGWEnv* e, RGWUserInfo* u)
-  : cct(_cct), cio(NULL), op(OP_UNKNOWN), err(0), user(u), has_acl_header(false),
+  : cct(_cct), cio(NULL), op(OP_UNKNOWN), user(u), has_acl_header(false),
     info(_cct, e)
 {
   enable_ops_log = e->conf.enable_ops_log;
@@ -272,14 +273,14 @@ req_state::req_state(CephContext* _cct, RGWEnv* e, RGWUserInfo* u)
 
 req_state::~req_state() {
   delete formatter;
-  delete err;
   delete bucket_acl;
   delete object_acl;
 }
 
 void set_req_state_err(struct rgw_err& err,	/* out */
 			int err_no,		/* in  */
-			const int prot_flags)	/* in  */
+			const int prot_flags,	/* in  */
+      RGWHandler* handler) /* in */
 {
   if (err_no < 0)
     err_no = -err_no;
@@ -287,7 +288,7 @@ void set_req_state_err(struct rgw_err& err,	/* out */
   err.ret = -err_no;
   err.is_website_redirect |= (prot_flags & RGW_REST_WEBSITE)
 		&& err_no == ERR_WEBSITE_REDIRECT && err.is_clear();
-  if (err.set_rgw_err(err_no))
+  if (handler->set_rgw_err(err_no, err.is_website_redirect, err.http_ret, err.s3_code))
     return;
   dout(0) << "WARNING: set_req_state_err err_no=" << err_no
 	<< " resorting to 500" << dendl;
@@ -296,16 +297,15 @@ void set_req_state_err(struct rgw_err& err,	/* out */
   err.s3_code = "UnknownError";
 }
 
-void req_state::set_req_state_err(int err_no)
+void req_state::set_req_state_err(int err_no, RGWHandler* handler)
 {
-  if (!err) err = new rgw_err(this);
-  ::set_req_state_err(*err, err_no, prot_flags);
+  ::set_req_state_err(err, err_no, prot_flags, handler);
 }
 
-void req_state::set_req_state_err(int err_no, const string &err_msg)
+void req_state::set_req_state_err(int err_no, const string &err_msg, RGWHandler* handler)
 {
-   set_req_state_err(err_no);
-   err->message = err_msg;
+   set_req_state_err(err_no, handler);
+   err.message = err_msg;
 }
 
 struct str_len {
@@ -381,37 +381,6 @@ std::ostream& operator<<(std::ostream& oss, const rgw_err &err)
 {
   oss << "rgw_err(http_ret=" << err.http_ret << ", s3='" << err.s3_code << "') ";
   return oss;
-}
-
-void rgw_err::dump() const
-{
-  if (s.format != RGW_FORMAT_HTML)
-    s.formatter->open_object_section("Error");
-  if (!s3_code.empty())
-    s.formatter->dump_string("Code", s3_code);
-  if (!message.empty())
-    s.formatter->dump_string("Message", message);
-  if (!s.bucket_name.empty())	// TODO: connect to expose_bucket
-    s.formatter->dump_string("BucketName", s.bucket_name);
-  if (!s.trans_id.empty())	// TODO: connect to expose_bucket or another toggle
-    s.formatter->dump_string("RequestId", s.trans_id);
-  s.formatter->dump_string("HostId", s.host_id);
-  if (s.format != RGW_FORMAT_HTML)
-    s.formatter->close_section();
-}
-
-bool rgw_err::set_rgw_err(int err_no)
-{
-  rgw_http_errors::const_iterator r;
-
-  r = rgw_http_s3_errors.find(err_no);
-  if (r != rgw_http_s3_errors.end()) {
-    if (!is_website_redirect)
-      http_ret = r->second.first;
-    s3_code = r->second.second;
-    return true;
-  }
-  return false;
 }
 
 string rgw_string_unquote(const string& s)

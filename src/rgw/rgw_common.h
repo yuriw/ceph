@@ -268,22 +268,20 @@ enum RGWObjCategory {
 
 /** Store error returns for output at a different point in the program */
 struct rgw_err {
-  rgw_err(req_state *s);
-  virtual ~rgw_err() { };
+  rgw_err();
   void clear();
   bool is_clear() const;
   bool is_err() const;
   friend std::ostream& operator<<(std::ostream& oss, const rgw_err &err);
-  virtual void dump() const;
-  virtual bool set_rgw_err(int);
 
-  req_state &s;
   bool is_website_redirect;
   int http_ret;
   int ret;
   std::string s3_code;
   std::string message;
 };
+
+
 
 /* Helper class used for RGWHTTPArgs parsing */
 class NameVal
@@ -1271,6 +1269,7 @@ struct req_init_state {
 
 /* XXX why don't RGWRequest (or descendants) hold this state? */
 class RGWRequest;
+class RGWHandler;
 
 #include "rgw_auth.h"
 
@@ -1289,7 +1288,7 @@ struct req_state {
   const char *length;
   int64_t content_length;
   map<string, string> generic_attrs;
-  rgw_err *err;
+  rgw_err err;
   bool expect_cont;
   bool header_ended;
   uint64_t obj_size;
@@ -1374,11 +1373,11 @@ struct req_state {
   req_state(CephContext* _cct, RGWEnv* e, RGWUserInfo* u);
   ~req_state();
 
-  void set_req_state_err(int err_no);
-  void set_req_state_err(int err_no, const string &err_msg);
-  bool is_err() const { return err && err->is_err(); }
+  void set_req_state_err(int err_no, RGWHandler* handler);
+  void set_req_state_err(int err_no, const string &err_msg, RGWHandler* handler);
+  bool is_err() const { return err.is_err(); }
 };
-void set_req_state_err(struct rgw_err&, int, const int);
+void set_req_state_err(struct rgw_err&, int, const int, RGWHandler*);
 
 /** Store basic data on an object */
 struct RGWObjEnt {
