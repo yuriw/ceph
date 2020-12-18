@@ -1,0 +1,14 @@
+tasks:
+- print: "**** done start installing octopus..."
+- cephadm:
+    #image: docker.io/ceph/ceph:v15.2.0
+    #cephadm_branch: v15.2.0
+    image: docker.io/ceph/daemon-base:latest-octopus
+    cephadm_branch: octopus
+- print: "**** done end installing octopus..."
+
+- print: "**** done start parallel"
+- parallel:
+    - workload
+    - upgrade-sequence
+- print: "**** done end parallel"
