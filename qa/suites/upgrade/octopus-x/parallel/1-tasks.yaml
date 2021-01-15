@@ -19,6 +19,13 @@ tasks:
       - ceph config set mgr mgr/cephadm/use_repo_digest true --force
 - print: "**** done cephadm.shell ceph config set mgr..."
 
+- print: "**** done start cephadm.shell ceph config set mds..."
+- cephadm.shell:
+    host.a:
+      - ceph orch apply mds a
+- print: "**** done cephadm.shell ceph config set mds..."
+
+
 - print: "**** done start parallel"
 - parallel:
     - workload
